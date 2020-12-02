@@ -1,4 +1,5 @@
 import nengo
+import nengo.spa as spa
 import numpy as np
 
 import grid
@@ -14,8 +15,6 @@ mymap = """
 
 
 class Cell(grid.Cell):
-    def __init__(self):
-        self.cellcolor = 0
 
     def color(self):
         if self.wall:
@@ -34,6 +33,7 @@ class Cell(grid.Cell):
         return None
 
     def load(self, char):
+        self.cellcolor = 0
         if char == '#':
             self.wall = True
 
@@ -65,12 +65,11 @@ def move(t, x):
 
 
 # Your model might not be a nengo.Netowrk() - SPA is permitted
-model = nengo.Network()
+model = spa.SPA()
 with model:
     env = grid.GridNode(world, dt=0.005)
 
     movement = nengo.Node(move, size_in=2)
-
 
     # Three sensors for distance to the walls
     def detect(t):
@@ -83,7 +82,6 @@ with model:
     radar = nengo.Ensemble(n_neurons=500, dimensions=3, radius=4)
     nengo.Connection(stim_radar, radar)
 
-
     # a basic movement function that just avoids walls based
     def movement_func(x):
         turn = x[2] - x[0]
@@ -94,7 +92,6 @@ with model:
     # the movement function is only driven by information from the
     # radar
     nengo.Connection(radar, movement, function=movement_func)
-
 
     # if you wanted to know the position in the world, this is how to do it
     # The first two dimensions are X,Y coordinates, the third is the orientation
@@ -108,3 +105,26 @@ with model:
     # This node returns the colour of the cell currently occupied. Note that you might want to transform this into
     # something else (see the assignment)
     current_color = nengo.Node(lambda t: body.cell.cellcolor)
+
+    D = 32
+    vocab = spa.Vocabulary(D)
+    vocab.parse("Green+Red+Blue+Magenta+Yellow+White")
+    model.converter = spa.State(D, vocab=vocab)
+
+
+    def convert(x):
+        if x == 1:
+            return vocab['Green'].v.reshape(D)
+        elif x == 2:
+            return vocab['Red'].v.reshape(D)
+        elif x == 3:
+            return vocab['Blue'].v.reshape(D)
+        elif x == 4:
+            return vocab['Magenta'].v.reshape(D)
+        elif x == 5:
+            return vocab['Yellow'].v.reshape(D)
+        else:
+            return vocab['White'].v.reshape(D)
+
+
+    nengo.Connection(current_color, model.converter.input, function=convert)
