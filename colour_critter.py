@@ -1,4 +1,5 @@
 import nengo
+import nengo.spa as spa
 import numpy as np
 
 import grid
@@ -65,7 +66,8 @@ def move(t, x):
 
 
 # Your model might not be a nengo.Netowrk() - SPA is permitted
-model = nengo.Network()
+
+model = spa.SPA()
 with model:
     env = grid.GridNode(world, dt=0.005)
 
@@ -107,4 +109,27 @@ with model:
 
     # This node returns the colour of the cell currently occupied. Note that you might want to transform this into
     # something else (see the assignment)
-    current_color = nengo.Node(lambda t: body.cell.cellcolor)
+    current_color = nengo.Node(lambda t: body.cell.cellcolor
+
+    D = 32
+    vocab = spa.Vocabulary(D)
+    vocab.parse("Green+Red+Blue+Magenta+Yellow+White")
+    model.converter = spa.State(D, vocab=vocab)
+
+
+    def convert(x):
+        if x == 1:
+            return vocab['Green'].v.reshape(D)
+        elif x == 2:
+            return vocab['Red'].v.reshape(D)
+        elif x == 3:
+            return vocab['Blue'].v.reshape(D)
+        elif x == 4:
+            return vocab['Magenta'].v.reshape(D)
+        elif x == 5:
+            return vocab['Yellow'].v.reshape(D)
+        else:
+            return vocab['White'].v.reshape(D)
+
+
+    nengo.Connection(current_color, model.converter.input, function=convert)
