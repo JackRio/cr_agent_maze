@@ -1,9 +1,8 @@
 # grid.py courtesy of Terry Stewart, UWaterloo
-#see https://github.com/tcstewar/syde556-1/
+# see https://github.com/tcstewar/syde556-1/
 
 import math
 import random
-import sys
 
 neighbour_synonyms = ('neighbours', 'neighbors', 'neighbour', 'neighbor')
 
@@ -258,7 +257,6 @@ class World(object):
                           (0, -1), (1, -1)][dir]
         return dx, dy
 
-
     def get_point_in_direction(self, x, y, dir):
         dx, dy = self.get_offset_in_direction(x, y, dir)
 
@@ -274,7 +272,7 @@ class World(object):
         if y2 >= self.height:
             y2 -= self.height
 
-        return (x2, y2)
+        return x2, y2
 
     def remove(self, agent):
         self.agents.remove(agent)
@@ -314,26 +312,26 @@ class World(object):
 class CellularException(Exception):
     pass
 
-	
+
 class ContinuousAgent(Agent):
     def go_in_direction(self, dir, distance=1, return_obstacle=False):
 
-        dir1=int(dir)
-        dir2=(dir1+1)%self.world.directions
+        dir1 = int(dir)
+        dir2 = (dir1 + 1) % self.world.directions
 
         dx1, dy1 = self.world.get_offset_in_direction(self.cell.x, self.cell.y, dir1)
         dx2, dy2 = self.world.get_offset_in_direction(self.cell.x, self.cell.y, dir2)
 
-        scale=dir % 1
+        scale = dir % 1
 
-        x = self.x + distance*(dx2*scale + dx1*(1 - scale))
-        y = self.y + distance*(dy2*scale + dy1*(1 - scale))
+        x = self.x + distance * (dx2 * scale + dx1 * (1 - scale))
+        y = self.y + distance * (dy2 * scale + dy1 * (1 - scale))
 
         closest = self.cell
-        dist = (x-self.cell.x)**2 + (y-self.cell.y)**2
+        dist = (x - self.cell.x) ** 2 + (y - self.cell.y) ** 2
         for n in self.cell.neighbour:
-            d = (x-n.x)**2 + (y-n.y)**2
-            if d<dist:
+            d = (x - n.x) ** 2 + (y - n.y) ** 2
+            if d < dist:
                 closest = n
                 dist = d
         if closest is not self.cell:
@@ -343,10 +341,10 @@ class ContinuousAgent(Agent):
                 else:
                     return False
             else:
-                self.cell=closest
+                self.cell = closest
 
-        self.x=x
-        self.y=y
+        self.x = x
+        self.y = y
 
         if return_obstacle:
             return None
@@ -377,7 +375,7 @@ class ContinuousAgent(Agent):
             elif delta > min_delta:
                 delta = delta / 2
             else:
-                distance = math.sqrt((start_x-self.x)**2 + (start_y-self.y)**2)
+                distance = math.sqrt((start_x - self.x) ** 2 + (start_y - self.y) ** 2)
                 break
         self.cell = cell
         self.x = start_x
@@ -388,17 +386,19 @@ class ContinuousAgent(Agent):
         dx = cell.x - self.x
         dy = cell.y - self.y
 
-        theta = math.atan2(dy, dx) + math.pi/2
+        theta = math.atan2(dy, dx) + math.pi / 2
         theta *= self.world.directions / (2 * math.pi)
         return theta
 
     def get_distance_to(self, cell):
         dx = cell.x - self.x
         dy = cell.y - self.y
-        return math.sqrt(dx**2 + dy**2)
+        return math.sqrt(dx ** 2 + dy ** 2)
 
-		
-import nengo		
+
+import nengo
+
+
 # GridNode sets up the pacman world for visualization
 class GridNode(nengo.Node):
     def __init__(self, world, dt=0.001):
@@ -409,6 +409,7 @@ class GridNode(nengo.Node):
             if last_t is None or t >= last_t + dt or t <= last_t:
                 svg._nengo_html_ = self.generate_svg(world)
                 svg._nengo_html_t_ = t
+
         super(GridNode, self).__init__(svg)
 
     # This function sets up an SVG (used to embed html code in the environment)
@@ -424,7 +425,7 @@ class GridNode(nengo.Node):
 
                 if color is not None:
                     cells.append('<rect x=%d y=%d width=1 height=1 style="fill:%s"/>' %
-                         (i, j, color))
+                                 (i, j, color))
 
         # Runs through every agent in the world
         agents = []
@@ -441,13 +442,13 @@ class GridNode(nengo.Node):
             if shape == 'triangle':
 
                 agent_poly = ('<polygon points="0.25,0.25 -0.25,0.25 0,-0.5"'
-                         ' style="fill:%s" transform="translate(%f,%f) rotate(%f)"/>'
-                         % (color, agent.x+0.5, agent.y+0.5, direction))
+                              ' style="fill:%s" transform="translate(%f,%f) rotate(%f)"/>'
+                              % (color, agent.x + 0.5, agent.y + 0.5, direction))
 
             elif shape == 'circle':
                 agent_poly = ('<circle '
-                         ' style="fill:%s" cx="%f" cy="%f" r="0.4"/>'
-                         % (color, agent.x+0.5, agent.y+0.5))
+                              ' style="fill:%s" cx="%f" cy="%f" r="0.4"/>'
+                              % (color, agent.x + 0.5, agent.y + 0.5))
 
             agents.append(agent_poly)
 
@@ -458,4 +459,3 @@ class GridNode(nengo.Node):
             </svg>''' % (world.width, world.height,
                          ''.join(cells), ''.join(agents))
         return svg
-	
