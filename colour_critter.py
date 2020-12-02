@@ -15,6 +15,8 @@ mymap = """
 
 
 class Cell(grid.Cell):
+    def __init__(self):
+        self.cellcolor = 0
 
     def color(self):
         if self.wall:
@@ -33,7 +35,6 @@ class Cell(grid.Cell):
         return None
 
     def load(self, char):
-        self.cellcolor = 0
         if char == '#':
             self.wall = True
 
@@ -65,6 +66,7 @@ def move(t, x):
 
 
 # Your model might not be a nengo.Netowrk() - SPA is permitted
+
 model = spa.SPA()
 with model:
     env = grid.GridNode(world, dt=0.005)
@@ -107,7 +109,7 @@ with model:
 
     # This node returns the colour of the cell currently occupied. Note that you might want to transform this into
     # something else (see the assignment)
-    current_color = nengo.Node(lambda t: body.cell.cellcolor)
+    current_color = nengo.Node(lambda t: body.cell.cellcolor
 
     D = 32
     vocab = spa.Vocabulary(D)
