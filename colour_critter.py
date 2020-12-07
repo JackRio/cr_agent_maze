@@ -113,7 +113,12 @@ with model:
     vocab = spa.Vocabulary(D)
     vocab.parse("Green+Red+Blue+Magenta+Yellow+White")
     model.converter = spa.State(D, vocab=vocab)
-
+    model.memory = spa.State(D)
+    model.new_color = spa.State(D)
+    
+    model.cleanup = spa.AssociativeMemory(input_vocab=vocab, wta_output=True)
+    nengo.Connection(model.cleanup.output, model.memory.input, synapse=0.01)
+    nengo.Connection(model.memory.output, model.cleanup.input, synapse=0.01)
 
     def convert(x):
         if x == 1:
@@ -131,3 +136,12 @@ with model:
 
 
     nengo.Connection(current_color, model.converter.input, function=convert)
+    
+    actions = spa.Actions(
+        'new_color = ~converter * memory',
+        'memory = new_color * converter',
+        )
+ 
+    model.cortical = spa.Cortical(actions)
+    
+
