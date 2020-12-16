@@ -112,14 +112,13 @@ with model:
     D = 32
     vocab = spa.Vocabulary(D)
     vocab.parse("Green+Red+Blue+Magenta+Yellow+White")
-    model.converter = spa.State(D, vocab=vocab)
-    model.memory = spa.State(D)
-    model.new_color = spa.State(D)
-    
-    model.cleanup = spa.AssociativeMemory(input_vocab=vocab, wta_output=True)
-    nengo.Connection(model.cleanup.output, model.memory.input, synapse=0.01)
-    nengo.Connection(model.memory.output, model.cleanup.input, synapse=0.01)
 
+    model.green = spa.State(D)
+    model.red = spa.State(D)
+    model.yellow = spa.State(D)
+    model.magenta = spa.State(D)
+    model.blue = spa.State(D)
+    model.white = spa.State(D)
     def convert(x):
         if x == 1:
             return vocab['Green'].v.reshape(D)
@@ -134,14 +133,22 @@ with model:
         else:
             return vocab['White'].v.reshape(D)
 
-
+    model.converter = spa.State(D, vocab = vocab)
     nengo.Connection(current_color, model.converter.input, function=convert)
     
     actions = spa.Actions(
-        'new_color = ~converter * memory',
-        'memory = new_color * converter',
+        'dot(converter, Green) --> green=Y',
+        'dot(green, Y) --> green=Y',
+        'dot(converter, Red) --> red=Y',
+        'dot(red, Y) --> red=Y',
+        'dot(converter, Blue) --> blue=Y',
+        'dot(blue, Y) --> blue=Y',
+        'dot(converter, Magenta) --> magenta=Y',
+        'dot(magenta, Y) --> magenta=Y',
+        'dot(converter, Yellow) --> yellow=Y',
+        'dot(yellow, Y) --> yellow=Y',
+        'dot(converter, White) --> white=Y',
+        'dot(white, Y) --> white=Y'
         )
- 
-    model.cortical = spa.Cortical(actions)
-    
-
+    model.bg = spa.BasalGanglia(actions)
+    model.thalamus = spa.Thalamus(model.bg)
