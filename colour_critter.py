@@ -1,6 +1,7 @@
 import nengo
 import nengo.spa as spa
 import numpy as np
+import matplotlib.pyplot as plt
 
 import grid
 
@@ -64,7 +65,7 @@ def move(t, x):
     body.go_forward(speed * dt * max_speed)
 
 
-# Your model might not be a nengo.Netowrk() - SPA is permitted
+# Your model might not be a nengo.Netowrk() - SPA is permitted:q
 model = spa.SPA()
 with model:
     env = grid.GridNode(world, dt=0.005)
@@ -119,8 +120,6 @@ with model:
     model.yellow = spa.State(D2, vocab=vocab2)
     model.magenta = spa.State(D2, vocab=vocab2)
     model.blue = spa.State(D2, vocab=vocab2)
-    model.white = spa.State(D2, vocab=vocab2)
-
 
     def convert(x):
         if x == 1:
@@ -157,10 +156,6 @@ with model:
     nengo.Connection(model.yellow.output, model.clean_yellow.input, synapse=0.01)
     nengo.Connection(model.clean_yellow.output, model.yellow.output, synapse=0.01)
 
-    model.clean_white = spa.AssociativeMemory(vocab2, wta_output=True, threshold=0.3)
-    nengo.Connection(model.white.output, model.clean_white.input, synapse=0.01)
-    nengo.Connection(model.clean_white.output, model.white.output, synapse=0.01)
-
     model.converter = spa.State(D, vocab=vocab)
     nengo.Connection(current_color, model.converter.input, function=convert)
 
@@ -169,8 +164,49 @@ with model:
         'dot(converter, Red) --> red=Y',
         'dot(converter, Blue) --> blue=Y',
         'dot(converter, Magenta) --> magenta=Y',
-        'dot(converter, Yellow) --> yellow=Y',
-        'dot(converter, White) --> white=Y'
+        'dot(converter, Yellow) --> yellow=Y'
     )
     model.bg = spa.BasalGanglia(actions)
     model.thalamus = spa.Thalamus(model.bg)
+
+dt = 0.001
+
+
+class Counter(object):
+
+    def __init__(self):
+        self.count = 0
+
+    def state_func(self, t, x):
+        if x > 0.8:
+            self.count += 1
+
+        return self.count
+
+
+def in_func(t):
+    if ((t - dt) % 1) > 0.5:
+        return 1
+    else:
+        return 0
+
+
+counter = Counter()
+
+with nengo.Network() as model:
+    in_nd = nengo.Node(in_func, size_out=1)
+    state_nd = nengo.Node(counter.state_func, size_in=1, size_out=1)
+
+    nengo.Connection(in_nd, state_nd, synapse=None)
+
+    p_in = nengo.Probe(in_nd)
+    p_state = nengo.Probe(state_nd)
+
+with nengo.Simulator(model) as sim:
+    sim.run(3.0)
+
+plt.plot(sim.data[p_in])
+plt.show()
+
+plt.plot(sim.data[p_state])
+plt.show()
