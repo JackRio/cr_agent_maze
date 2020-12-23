@@ -190,5 +190,6 @@ with model:
         )    
     model.bg_thresh = spa.BasalGanglia(threshold_actions)
     model.thalamus_thresh = spa.Thalamus(model.bg_thresh)
-    
-   
+
+    print("monicas update")
+
