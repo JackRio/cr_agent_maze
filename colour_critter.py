@@ -114,6 +114,9 @@ with model:
 
     vocab2 = spa.Vocabulary(D2)
     vocab2.parse("Y+N")
+    
+    vocab3 = spa.Vocabulary(D)
+    vocab3.parse("One+Two+Three+Four+Five")
 
     model.green = spa.State(D2, vocab=vocab2)
     model.red = spa.State(D2, vocab=vocab2)
@@ -168,45 +171,24 @@ with model:
     )
     model.bg = spa.BasalGanglia(actions)
     model.thalamus = spa.Thalamus(model.bg)
-
-dt = 0.001
-
-
-class Counter(object):
-
-    def __init__(self):
-        self.count = 0
-
-    def state_func(self, t, x):
-        if x > 0.8:
-            self.count += 1
-
-        return self.count
-
-
-def in_func(t):
-    if ((t - dt) % 1) > 0.5:
-        return 1
-    else:
-        return 0
-
-
-counter = Counter()
-
-with nengo.Network() as model:
-    in_nd = nengo.Node(in_func, size_out=1)
-    state_nd = nengo.Node(counter.state_func, size_in=1, size_out=1)
-
-    nengo.Connection(in_nd, state_nd, synapse=None)
-
-    p_in = nengo.Probe(in_nd)
-    p_state = nengo.Probe(state_nd)
-
-with nengo.Simulator(model) as sim:
-    sim.run(3.0)
-
-plt.plot(sim.data[p_in])
-plt.show()
-
-plt.plot(sim.data[p_state])
-plt.show()
+    
+    model.count = spa.State(D2)
+    model.threshold = spa.State(D2)
+    model.user_input = spa.State(D2)
+    
+    count_actions = spa.Actions(
+        'count=green + red + blue + magenta + yellow'
+    )
+    model.cortical = spa.Cortical(count_actions)
+    
+    threshold_actions = spa.Actions(
+        'dot(user_input, One) --> threshold = Y+N+N+N+N',
+        'dot(user_input, Two) --> threshold = Y+Y+N+N+N',
+        'dot(user_input, Three) --> threshold = Y+Y+Y+N+N',
+        'dot(user_input, Four) --> threshold = Y+Y+Y+Y+N',
+        'dot(user_input, Five) --> threshold = Y+Y+Y+Y+Y'
+        )    
+    model.bg_thresh = spa.BasalGanglia(threshold_actions)
+    model.thalamus_thresh = spa.Thalamus(model.bg_thresh)
+    
+   
