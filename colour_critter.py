@@ -152,3 +152,5 @@ with model:
         )
     model.bg = spa.BasalGanglia(actions)
     model.thalamus = spa.Thalamus(model.bg)
+
+print("Made an update")
