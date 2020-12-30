@@ -7,8 +7,8 @@ import grid
 mymap = """
 #######
 #  M  #
+# # #B#
 # # # #
-# #B# #
 #G Y R#
 #######
 """
@@ -119,8 +119,6 @@ with model:
     model.yellow = spa.State(D2, vocab=vocab2)
     model.magenta = spa.State(D2, vocab=vocab2)
     model.blue = spa.State(D2, vocab=vocab2)
-    model.white = spa.State(D2, vocab=vocab2)
-
 
     def convert(x):
         if x == 1:
@@ -157,10 +155,6 @@ with model:
     nengo.Connection(model.yellow.output, model.clean_yellow.input, synapse=0.01)
     nengo.Connection(model.clean_yellow.output, model.yellow.output, synapse=0.01)
 
-    model.clean_white = spa.AssociativeMemory(vocab2, wta_output=True, threshold=0.3)
-    nengo.Connection(model.white.output, model.clean_white.input, synapse=0.01)
-    nengo.Connection(model.clean_white.output, model.white.output, synapse=0.01)
-
     model.converter = spa.State(D, vocab=vocab)
     nengo.Connection(current_color, model.converter.input, function=convert)
 
@@ -169,8 +163,32 @@ with model:
         'dot(converter, Red) --> red=Y',
         'dot(converter, Blue) --> blue=Y',
         'dot(converter, Magenta) --> magenta=Y',
-        'dot(converter, Yellow) --> yellow=Y',
-        'dot(converter, White) --> white=Y'
+        'dot(converter, Yellow) --> yellow=Y'
     )
     model.bg = spa.BasalGanglia(actions)
     model.thalamus = spa.Thalamus(model.bg)
+    
+    def conv_func(x):
+        if x =="A":
+            final = x * model.convolves.output
+        else:
+            final = model.convolves.output
+        return final
+    
+    model.convolves = spa.State(D2, vocab=vocab2)
+    model.start = spa.State(D2, vocab=vocab2)
+    
+    conv_actions = spa.Actions(
+        'dot(green, Y) --> convolves=convolves * Y',
+        'dot(red, Y) --> convolves=convolves * Y',
+        'dot(blue, Y) --> convolves=convolves * Y',
+        'dot(magenta, Y) --> convolves=convolves * Y',
+        'dot(yellow, Y) --> convolves=convolves * Y',
+        'dot(start, Y) --> convolves=Y',
+        '0.5 -->'
+        )
+    model.clean_convolves = spa.AssociativeMemory(vocab2, wta_output=True, threshold=0.3)
+    nengo.Connection(model.convolves.output, model.clean_convolves.input, synapse=0.01)
+    nengo.Connection(model.clean_convolves.output, model.convolves.output, synapse=0.01)
+    model.conv_bg = spa.BasalGanglia(conv_actions)
+    model.conv_thalamus = spa.Thalamus(model.conv_bg)
