@@ -1,6 +1,7 @@
 import nengo
 import nengo.spa as spa
 import numpy as np
+import matplotlib.pyplot as plt
 
 import grid
 
@@ -64,12 +65,13 @@ def move(t, x):
     body.go_forward(speed * dt * max_speed)
 
 
-# Your model might not be a nengo.Netowrk() - SPA is permitted
+# Your model might not be a nengo.Netowrk() - SPA is permitted:q
 model = spa.SPA()
 with model:
     env = grid.GridNode(world, dt=0.005)
 
     movement = nengo.Node(move, size_in=2)
+
 
     # Three sensors for distance to the walls
     def detect(t):
@@ -82,6 +84,7 @@ with model:
     radar = nengo.Ensemble(n_neurons=500, dimensions=3, radius=4)
     nengo.Connection(stim_radar, radar)
 
+
     # a basic movement function that just avoids walls based
     def movement_func(x):
         turn = x[2] - x[0]
@@ -92,6 +95,7 @@ with model:
     # the movement function is only driven by information from the
     # radar
     nengo.Connection(radar, movement, function=movement_func)
+
 
     # if you wanted to know the position in the world, this is how to do it
     # The first two dimensions are X,Y coordinates, the third is the orientation
@@ -108,17 +112,28 @@ with model:
 
     D = 32
     D2 = 2
+
+    # vocabswitch= ("ON+OFF")
+
+    vocabswitch = spa.Vocabulary(D2)
+    vocabswitch.parse("ON+OFF")
+
     vocab = spa.Vocabulary(D)
     vocab.parse("Green+Red+Blue+White+Magenta+Yellow")
 
     vocab2 = spa.Vocabulary(D2)
     vocab2.parse("Y+N")
 
+    vocab3 = spa.Vocabulary(D)
+    vocab3.parse("One+Two+Three+Four+Five")
+
     model.green = spa.State(D2, vocab=vocab2)
     model.red = spa.State(D2, vocab=vocab2)
     model.yellow = spa.State(D2, vocab=vocab2)
     model.magenta = spa.State(D2, vocab=vocab2)
     model.blue = spa.State(D2, vocab=vocab2)
+
+    model.switch1 = spa.State(D2, vocab=vocabswitch)
 
     def convert(x):
         if x == 1:
@@ -167,17 +182,17 @@ with model:
     )
     model.bg = spa.BasalGanglia(actions)
     model.thalamus = spa.Thalamus(model.bg)
-    
+
     def conv_func(x):
         if x =="A":
             final = x * model.convolves.output
         else:
             final = model.convolves.output
         return final
-    
+
     model.convolves = spa.State(D2, vocab=vocab2)
     model.start = spa.State(D2, vocab=vocab2)
-    
+
     conv_actions = spa.Actions(
         'dot(green, Y) --> convolves=convolves * Y',
         'dot(red, Y) --> convolves=convolves * Y',
@@ -192,3 +207,25 @@ with model:
     nengo.Connection(model.clean_convolves.output, model.convolves.output, synapse=0.01)
     model.conv_bg = spa.BasalGanglia(conv_actions)
     model.conv_thalamus = spa.Thalamus(model.conv_bg)
+
+    model.count = spa.State(D2)
+    model.threshold = spa.State(D2)
+    model.user_input = spa.State(D2)
+
+    # convolve all colours
+    count_actions = spa.Actions(
+        'count=green + red + blue + magenta + yellow'
+    )
+    model.cortical = spa.Cortical(count_actions)
+
+    threshold_actions = spa.Actions(
+        'dot(user_input, One) --> switch1 =ON',
+        'dot(user_input, Two) --> threshold = Y*Y*N*N*N',
+        'dot(user_input, Three) --> threshold = Y*Y*Y*N*N',
+        'dot(user_input, Four) --> threshold = Y*Y*Y*Y*N',
+        'dot(user_input, Five) --> threshold = Y*Y*Y*Y*Y',
+        'dot(count,Y*N*N*N*N) + dot(switch1, ON)-1 --> '
+    )
+
+    model.bg_thresh = spa.BasalGanglia(threshold_actions)
+    model.thalamus_thresh = spa.Thalamus(model.bg_thresh)
