@@ -1,6 +1,7 @@
 import nengo
 import nengo.spa as spa
 import numpy as np
+import matplotlib.pyplot as plt
 
 import grid
 
@@ -15,8 +16,6 @@ mymap = """
 
 
 class Cell(grid.Cell):
-    def __init__(self):
-        self.cellcolor = 0
 
     def color(self):
         if self.wall:
@@ -35,6 +34,7 @@ class Cell(grid.Cell):
         return None
 
     def load(self, char):
+        self.cellcolor = 0
         if char == '#':
             self.wall = True
 
@@ -65,8 +65,7 @@ def move(t, x):
     body.go_forward(speed * dt * max_speed)
 
 
-# Your model might not be a nengo.Netowrk() - SPA is permitted
-
+# Your model might not be a nengo.Netowrk() - SPA is permitted:q
 model = spa.SPA()
 with model:
     env = grid.GridNode(world, dt=0.005)
@@ -109,22 +108,31 @@ with model:
 
     # This node returns the colour of the cell currently occupied. Note that you might want to transform this into
     # something else (see the assignment)
-    current_color = nengo.Node(lambda t: body.cell.cellcolor
+    current_color = nengo.Node(lambda t: body.cell.cellcolor)
 
     D = 32
     D2 = 2
+
+    # vocabswitch= ("ON+OFF")
+
+    vocabswitch = spa.Vocabulary(D2)
+    vocabswitch.parse("ON+OFF")
+
     vocab = spa.Vocabulary(D)
     vocab.parse("Green+Red+Blue+White+Magenta+Yellow")
 
     vocab2 = spa.Vocabulary(D2)
     vocab2.parse("Y+N")
 
+    vocab3 = spa.Vocabulary(D)
+    vocab3.parse("One+Two+Three+Four+Five")
+
     model.green = spa.State(D2, vocab=vocab2)
     model.red = spa.State(D2, vocab=vocab2)
     model.yellow = spa.State(D2, vocab=vocab2)
     model.magenta = spa.State(D2, vocab=vocab2)
     model.blue = spa.State(D2, vocab=vocab2)
-    model.white = spa.State(D2, vocab=vocab2)
+    model.switch1 = spa.State(D2, vocab=vocabswitch)
 
 
     def convert(x):
@@ -162,10 +170,6 @@ with model:
     nengo.Connection(model.yellow.output, model.clean_yellow.input, synapse=0.01)
     nengo.Connection(model.clean_yellow.output, model.yellow.output, synapse=0.01)
 
-    model.clean_white = spa.AssociativeMemory(vocab2, wta_output=True, threshold=0.3)
-    nengo.Connection(model.white.output, model.clean_white.input, synapse=0.01)
-    nengo.Connection(model.clean_white.output, model.white.output, synapse=0.01)
-
     model.converter = spa.State(D, vocab=vocab)
     nengo.Connection(current_color, model.converter.input, function=convert)
 
@@ -174,8 +178,30 @@ with model:
         'dot(converter, Red) --> red=Y',
         'dot(converter, Blue) --> blue=Y',
         'dot(converter, Magenta) --> magenta=Y',
-        'dot(converter, Yellow) --> yellow=Y',
-        'dot(converter, White) --> white=Y'
+        'dot(converter, Yellow) --> yellow=Y'
     )
     model.bg = spa.BasalGanglia(actions)
     model.thalamus = spa.Thalamus(model.bg)
+
+    model.count = spa.State(D2)
+    model.threshold = spa.State(D2)
+    model.user_input = spa.State(D2)
+
+    # convolve all colours
+    count_actions = spa.Actions(
+        'count=green + red + blue + magenta + yellow'
+    )
+    model.cortical = spa.Cortical(count_actions)
+
+    threshold_actions = spa.Actions(
+        'dot(user_input, One) --> switch1 =ON',
+        'dot(user_input, Two) --> threshold = Y*Y*N*N*N',
+        'dot(user_input, Three) --> threshold = Y*Y*Y*N*N',
+        'dot(user_input, Four) --> threshold = Y*Y*Y*Y*N',
+        'dot(user_input, Five) --> threshold = Y*Y*Y*Y*Y',
+        'dot(count,Y*N*N*N*N) + dot(switch1, ON)-1 --> '
+    )
+
+    model.bg_thresh = spa.BasalGanglia(threshold_actions)
+    model.thalamus_thresh = spa.Thalamus(model.bg_thresh)
+
