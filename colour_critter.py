@@ -3,16 +3,20 @@ import math
 import nengo
 import nengo.spa as spa
 import numpy as np
+import random
 
 import grid
 
 mymap = """
-#######
-#  M  #
-# # #B#
-# # # #
-#G Y R#
-#######
+###############
+#             #
+# ######### # #
+#   #  #      #
+# # #   #   ###
+# #   # ###   #
+# # # # #     #
+#         #   #
+###############
 """
 
 
@@ -62,6 +66,7 @@ def move(t, x):
     dt = 0.001
     max_speed = 20.0
     max_rotate = 10.0
+
     body.turn(rotation * dt * max_rotate * run_stop)
     body.go_forward(speed * dt * max_speed * run_stop)
 
@@ -72,7 +77,6 @@ with model:
     env = grid.GridNode(world, dt=0.005)
 
     movement = nengo.Node(move, size_in=3)
-
 
     # Three sensors for distance to the walls
     def detect(t):
@@ -85,7 +89,6 @@ with model:
     radar = nengo.Ensemble(n_neurons=500, dimensions=3, radius=4)
     nengo.Connection(stim_radar, radar)
 
-
     # a basic movement function that just avoids walls based
     def movement_func(x):
         turn = x[2] - x[0]
@@ -96,7 +99,6 @@ with model:
     # the movement function is only driven by information from the
     # radar
     nengo.Connection(radar, movement[:2], function=movement_func)
-
 
     # if you wanted to know the position in the world, this is how to do it
     # The first two dimensions are X,Y coordinates, the third is the orientation
@@ -112,7 +114,7 @@ with model:
     current_color = nengo.Node(lambda t: body.cell.cellcolor)
 
     D = 32
-    MAX_COLOURS = 3
+    WALK = 10
 
     color_list = ["GREEN", "RED", "YELLOW", "MAGENTA", "BLUE"]
 
@@ -123,8 +125,23 @@ with model:
     vocab2 = spa.Vocabulary(D)
     vocab2.parse("YES+NO")
 
+    model.converter = spa.State(D, vocab=vocab)
+    model.stop = nengo.Ensemble(1000, 1)
+    model.combine = nengo.Ensemble(500, 1, radius=4)
+
     for color in color_list:
         exec(f"model.{color.lower()} = spa.State(D, vocab=vocab2)")
+
+
+    def threshold(x):
+        if math.isclose(x[0], WALK, rel_tol=0.2):
+            return [0.]
+        else:
+            return [1.]
+
+
+    def spa_to_nengo(x):
+        return [1.] if vocab["YES"].dot(x) else [0.]
 
 
     def convert(x):
@@ -147,7 +164,6 @@ with model:
         exec(f"nengo.Connection(model.{color.lower()}.output, model.clean_{color.lower()}.input, synapse=0.01)")
         exec(f"nengo.Connection(model.clean_{color.lower()}.output, model.{color.lower()}.output, synapse=0.01)")
 
-    model.converter = spa.State(D, vocab=vocab)
     nengo.Connection(current_color, model.converter.input, function=convert)
 
     actions = spa.Actions(
@@ -161,22 +177,11 @@ with model:
     model.bg = spa.BasalGanglia(actions)
     model.thalamus = spa.Thalamus(model.bg)
 
-    def spa_to_nengo(x):
-        return [1.] if vocab["YES"].dot(x) else [0.]
-
-
-    model.integrator = nengo.Ensemble(500, 1, radius=4)
-
     for colour in color_list:
         exec(f"model.clean_{colour.lower()}.output.output = lambda t, x:x")
-        exec(f"nengo.Connection(model.clean_{colour.lower()}.output, model.integrator, function=spa_to_nengo)")
+        exec(f"nengo.Connection(model.clean_{colour.lower()}.output, model.combine, function=spa_to_nengo)")
 
-    model.stop = nengo.Ensemble(1000, 1)
-
-
-    def threshold(x):
-        return [0.] if math.isclose(x[0], MAX_COLOURS, rel_tol=0.2) else [1.]
-
-
-    nengo.Connection(model.integrator, model.stop, function=threshold)
+    nengo.Connection(model.combine, model.stop, function=threshold)
     nengo.Connection(model.stop, movement[2])
+
+# Turning left/right if there is no wall
