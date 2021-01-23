@@ -1,9 +1,8 @@
 import math
-import numpy as np
+
 import nengo
 import nengo.spa as spa
-import random
-from nengo.processes import Piecewise
+import numpy as np
 
 import grid
 
@@ -190,7 +189,7 @@ with model:
     # Thijs Gelton helped us with the implementation of this part.
     for colour in color_list:
         exec(f"model.clean_{colour.lower()}.output.output = lambda t, x:x")
-        exec(f"nengo.Connection(model.clean_{colour.lower()}.output, model.integrator, function=spa_to_nengo)")
+        exec(f"nengo.Connection(model.clean_{colour.lower()}.output, model.counter, function=spa_to_nengo)")
     n_neurons = 1000
     model.stop = nengo.Ensemble(n_neurons, 1)
 
