@@ -1,9 +1,9 @@
 import math
-
+import numpy as np
 import nengo
 import nengo.spa as spa
-import numpy as np
 import random
+from nengo.processes import Piecewise
 
 import grid
 
@@ -11,11 +11,11 @@ mymap = """
 ###############
 #             #
 # ######### # #
-#   #  #      #
-# # #   #   ###
-# #   # ###   #
-# # # # #     #
-#         #   #
+#   #   #     #
+#R# #   #   ###
+#G#   # ###   #
+# # # # #   # #
+#Y        #B  #
 ###############
 """
 
@@ -64,10 +64,9 @@ world.add(body, x=1, y=2, dir=2)
 def move(t, x):
     speed, rotation, run_stop = x
     dt = 0.001
-    max_speed = 20.0
+    max_speed = 10.0
     max_rotate = 10.0
-    # print(run_stop)
-    # print(rotation * dt * max_rotate * run_stop)
+    # run_stop = np.piecewise(run_stop, [run_stop <= .2, run_stop > .2], [0, 1])
     body.turn(rotation * dt * max_rotate * run_stop)
     body.go_forward(speed * dt * max_speed * run_stop)
 
@@ -121,14 +120,12 @@ with model:
         return body.x / world.width * 2 - 1, 1 - body.y / world.height * 2, body.dir / world.directions
 
 
-    position = nengo.Node(position_func)
-
     # This node returns the colour of the cell currently occupied. Note that you might want to transform this into
     # something else (see the assignment)
     current_color = nengo.Node(lambda t: body.cell.cellcolor)
 
     D = 32
-    MAX_COLOURS = 4  # change if you want to detect more or less colours
+    MAX_COLOURS = 2  # change if you want to detect more or less colours
 
     color_list = ["GREEN", "RED", "YELLOW", "MAGENTA", "BLUE"]
 
@@ -188,27 +185,52 @@ with model:
         return [1.] if vocab["YES"].dot(x) else [0.]
 
 
-    model.integrator = nengo.Ensemble(500, 1, radius=4)
+    model.counter = nengo.Ensemble(500, 1, radius=4)
 
     # Thijs Gelton helped us with the implementation of this part.
     for colour in color_list:
         exec(f"model.clean_{colour.lower()}.output.output = lambda t, x:x")
         exec(f"nengo.Connection(model.clean_{colour.lower()}.output, model.integrator, function=spa_to_nengo)")
+    n_neurons = 1000
+    model.stop = nengo.Ensemble(n_neurons, 1)
 
-    model.stop = nengo.Ensemble(1000, 1)
+    # Change movement function
+    input = nengo.Node(output=np.sin)
+    tau = 0.1
+
+    func_switch = nengo.networks.Integrator(
+        tau, n_neurons=100, dimensions=1
+    )
+
+    # Connect the input
+    nengo.Connection(
+        input, func_switch.input, transform=[[1]], synapse=tau
+    )
 
 
     # very simple tresholhd that returns 0 when max colours is reachered (or atleast close enough given the rel_tol)
     def threshold(x):
         return [0.] if math.isclose(x[0], MAX_COLOURS, rel_tol=0.2) else [1.]
 
-
-    nengo.Connection(model.integrator, model.stop, function=threshold)
+    inhib = nengo.Node(size_in = 1)
+    
+    def inhibit(x):
+        """
+        This function triggers the inhib node which in turns set the value
+        of the stop neurons to exact 0 (i.e They are inhibited)
+        """
+        if math.isclose(x[0], MAX_COLOURS, rel_tol=0.2):
+            return [1.]
+        elif x[0] > MAX_COLOURS: 
+            # This is just in case we have colours in sequential pattern
+            return [1.]
+        else:
+            return [0.]
+        
+    nengo.Connection(model.counter, inhib, function = inhibit)
+    nengo.Connection(
+        inhib, model.stop.neurons, 
+        transform = -10*np.ones((n_neurons, 1))
+        )
+    nengo.Connection(model.counter, model.stop, function=threshold)
     nengo.Connection(model.stop, movement[2])
-
-    # how to make things more biologically plausable"
-    # - detecting the colours & encoding the colours more biologically plausable
-    # - memory of each colour --> into an integrated memory.
-    # - smarter navigation.
-    # - gather the stop information into a spa.network and then converting it
-    #   into a nengo node to get feedback into the movement (making use of the convolutions)
