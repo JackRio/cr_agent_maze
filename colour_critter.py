@@ -212,8 +212,10 @@ with model:
     def threshold(x):
         return [0.] if math.isclose(x[0], MAX_COLOURS, rel_tol=0.2) else [1.]
 
-    inhib = nengo.Node(size_in = 1)
-    
+
+    inhib = nengo.Node(size_in=1)
+
+
     def inhibit(x):
         """
         This function triggers the inhib node which in turns set the value
@@ -221,16 +223,17 @@ with model:
         """
         if math.isclose(x[0], MAX_COLOURS, rel_tol=0.2):
             return [1.]
-        elif x[0] > MAX_COLOURS: 
+        elif x[0] > MAX_COLOURS:
             # This is just in case we have colours in sequential pattern
             return [1.]
         else:
             return [0.]
-        
-    nengo.Connection(model.counter, inhib, function = inhibit)
+
+
+    nengo.Connection(model.counter, inhib, function=inhibit)
     nengo.Connection(
-        inhib, model.stop.neurons, 
-        transform = -10*np.ones((n_neurons, 1))
-        )
+        inhib, model.stop.neurons,
+        transform=-10 * np.ones((n_neurons, 1))
+    )
     nengo.Connection(model.counter, model.stop, function=threshold)
     nengo.Connection(model.stop, movement[2])
