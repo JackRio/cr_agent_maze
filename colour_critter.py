@@ -9,8 +9,8 @@ import grid
 mymap = """
 ###############
 #             #
-# ######### # #
-#   #   #     #
+#G######### # #
+#Y  #   #     #
 #R# #   #   ###
 #G#   # ###   #
 # # # # #   # #
@@ -97,26 +97,30 @@ with model:
         # x[0] = senosor in the left --> np "first black square to the critter
         # x[1] = sensory in the front.
         # the closer the wall is the slower it goes.
-
-        # print(np.shape(x))
         turn = x[2] - x[0]  #
         spd = x[1] - 0.5
-        # if x[0] <1:
-        #     # print("yes")
-        #     turn = turn * -1
         return spd, turn
-
 
     # the movement function is only driven by information from the
     # radar
+    # Change movement function
+    # sin_wave = nengo.Node(output=np.sin)
+    # tau = 0.1
+
+    # model.func_switch = nengo.networks.Integrator(
+    #     tau, n_neurons=100, dimensions=1
+    # )
+
+    # # Connect the input
+    # nengo.Connection(
+    #     sin_wave, model.func_switch.input, transform=[[1]], synapse=tau
+    # )
+    # def print_and_return(x):
+    #     print(x, type(x[0]))
+    #     return x
+    # nengo.Connection(model.func_switch.output, radar[3], function= print_and_return)
+    
     nengo.Connection(radar, movement[:2], function=movement_func)
-
-
-    # if you wanted to know the position in the world, this is how to do it
-    # The first two dimensions are X,Y coordinates, the third is the orientation
-    # (plotting XY value shows the first two dimensions)
-    def position_func(t):
-        return body.x / world.width * 2 - 1, 1 - body.y / world.height * 2, body.dir / world.directions
 
 
     # This node returns the colour of the cell currently occupied. Note that you might want to transform this into
@@ -124,7 +128,7 @@ with model:
     current_color = nengo.Node(lambda t: body.cell.cellcolor)
 
     D = 32
-    MAX_COLOURS = 2  # change if you want to detect more or less colours
+    MAX_COLOURS = 3 # change if you want to detect more or less colours
 
     color_list = ["GREEN", "RED", "YELLOW", "MAGENTA", "BLUE"]
 
@@ -183,8 +187,7 @@ with model:
     def spa_to_nengo(x):
         return [1.] if vocab["YES"].dot(x) else [0.]
 
-
-    model.counter = nengo.Ensemble(500, 1, radius=4)
+    model.counter = nengo.Ensemble(500, 1, radius=5)
 
     # Thijs Gelton helped us with the implementation of this part.
     for colour in color_list:
@@ -192,20 +195,6 @@ with model:
         exec(f"nengo.Connection(model.clean_{colour.lower()}.output, model.counter, function=spa_to_nengo)")
     n_neurons = 1000
     model.stop = nengo.Ensemble(n_neurons, 1)
-
-    # Change movement function
-    input = nengo.Node(output=np.sin)
-    tau = 0.1
-
-    func_switch = nengo.networks.Integrator(
-        tau, n_neurons=100, dimensions=1
-    )
-
-    # Connect the input
-    nengo.Connection(
-        input, func_switch.input, transform=[[1]], synapse=tau
-    )
-
 
     # very simple tresholhd that returns 0 when max colours is reachered (or atleast close enough given the rel_tol)
     def threshold(x):
