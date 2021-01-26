@@ -6,15 +6,17 @@ import numpy as np
 
 import grid
 
+MAX_COLOURS = 3 # change if you want to detect more or less colours
+
 mymap = """
 ###############
-#             #
-#G######### # #
-#Y  #   #     #
-#R# #   #   ###
-#G#   # ###   #
-# # # # #   # #
-#Y        #B  #
+# #           #
+# #           #
+#R#           #
+#G#           #
+#B#           #
+#Y#           #
+#MRGBYM       #
 ###############
 """
 
@@ -101,25 +103,6 @@ with model:
         spd = x[1] - 0.5
         return spd, turn
 
-    # the movement function is only driven by information from the
-    # radar
-    # Change movement function
-    # sin_wave = nengo.Node(output=np.sin)
-    # tau = 0.1
-
-    # model.func_switch = nengo.networks.Integrator(
-    #     tau, n_neurons=100, dimensions=1
-    # )
-
-    # # Connect the input
-    # nengo.Connection(
-    #     sin_wave, model.func_switch.input, transform=[[1]], synapse=tau
-    # )
-    # def print_and_return(x):
-    #     print(x, type(x[0]))
-    #     return x
-    # nengo.Connection(model.func_switch.output, radar[3], function= print_and_return)
-    
     nengo.Connection(radar, movement[:2], function=movement_func)
 
 
@@ -128,8 +111,7 @@ with model:
     current_color = nengo.Node(lambda t: body.cell.cellcolor)
 
     D = 32
-    MAX_COLOURS = 3 # change if you want to detect more or less colours
-
+    
     color_list = ["GREEN", "RED", "YELLOW", "MAGENTA", "BLUE"]
 
     vocab = spa.Vocabulary(D)
@@ -187,7 +169,7 @@ with model:
     def spa_to_nengo(x):
         return [1.] if vocab["YES"].dot(x) else [0.]
 
-    model.counter = nengo.Ensemble(500, 1, radius=5)
+    model.counter = nengo.Ensemble(1000, 1, radius=5)
 
     # Thijs Gelton helped us with the implementation of this part.
     for colour in color_list:
@@ -209,14 +191,15 @@ with model:
         This function triggers the inhib node which in turns set the value
         of the stop neurons to exact 0 (i.e They are inhibited)
         """
-        if math.isclose(x[0], MAX_COLOURS, rel_tol=0.2):
+        if math.isclose(x[0], MAX_COLOURS):
+            print(x)
             return [1.]
         elif x[0] > MAX_COLOURS:
+            print("final")
             # This is just in case we have colours in sequential pattern
             return [1.]
         else:
             return [0.]
-
 
     nengo.Connection(model.counter, inhib, function=inhibit)
     nengo.Connection(
