@@ -6,18 +6,15 @@ import numpy as np
 
 import grid
 
-MAX_COLOURS = 3 # change if you want to detect more or less colours
+MAX_COLOURS = 3  # change if you want to detect more or less colours
 
 mymap = """
-###############
-# #           #
-# #           #
-#R#           #
-#G#           #
-#B#           #
-#Y#           #
-#MRGBYM       #
-###############
+#######
+#  M  #
+# # # #
+# #B# #
+#G Y R#
+#######
 """
 
 
@@ -63,11 +60,15 @@ world.add(body, x=1, y=2, dir=2)
 
 
 def move(t, x):
+    """
+    This function calculates the rotation speed and moving speed of the agent.
+    :param x: State Input
+    :type x: float
+    """
     speed, rotation, run_stop = x
     dt = 0.001
     max_speed = 10.0
     max_rotate = 10.0
-    # run_stop = np.piecewise(run_stop, [run_stop <= .2, run_stop > .2], [0, 1])
     body.turn(rotation * dt * max_rotate * run_stop)
     body.go_forward(speed * dt * max_speed * run_stop)
 
@@ -75,51 +76,50 @@ def move(t, x):
 # Your model might not be a nengo.Netowrk() - SPA is permitted:q
 model = spa.SPA()
 with model:
-    env = grid.GridNode(world, dt=0.005)
 
+    env = grid.GridNode(world, dt=0.005)
     movement = nengo.Node(move, size_in=3)
 
-
-    # Three sensors for distance to the walls
     def detect(t):
+        """
+        This function calculates the distance of the agent from the walls in all three direction
+        left, right and forward
+        :return: sensory information about the distance from walls
+        :rtype: list
+        """
         angles = (np.linspace(-0.5, 0.5, 3) + body.dir) % world.directions
-        # [0] is the distance to the wall
-        # print([body.detect(d, max_distance=4)[0] for d in angles])
         return [body.detect(d, max_distance=4)[0] for d in angles]
 
-
-    stim_radar = nengo.Node(detect)
-
-    radar = nengo.Ensemble(n_neurons=500, dimensions=3, radius=4)
-    nengo.Connection(stim_radar, radar)
-
-
-    # a basic movement function that just avoids walls based
     def movement_func(x):
         # x[0] = senosor in the left --> np "first black square to the critter
         # x[1] = sensory in the front.
         # the closer the wall is the slower it goes.
-        turn = x[2] - x[0]  #
+        turn = x[2] - x[0]
         spd = x[1] - 0.5
         return spd, turn
 
-    nengo.Connection(radar, movement[:2], function=movement_func)
+    stim_radar = nengo.Node(detect)
+    radar = nengo.Ensemble(n_neurons=500, dimensions=3, radius=4)
 
+    nengo.Connection(stim_radar, radar)
+    nengo.Connection(radar, movement[:2], function=movement_func)
 
     # This node returns the colour of the cell currently occupied. Note that you might want to transform this into
     # something else (see the assignment)
     current_color = nengo.Node(lambda t: body.cell.cellcolor)
 
+    # Variables used in the code
     D = 32
-    
+    n_neurons = 1000
+
+    # The list of colours available in the environment/maze
     color_list = ["GREEN", "RED", "YELLOW", "MAGENTA", "BLUE"]
+    colour_vocab = spa.Vocabulary(D)
+    colour_vocab.parse("+".join(color_list))
+    colour_vocab.parse("WHITE")
 
-    vocab = spa.Vocabulary(D)
-    vocab.parse("+".join(color_list))
-    vocab.parse("WHITE")  # add afterwards because we don't want to detect it.
-
-    vocab2 = spa.Vocabulary(D)
-    vocab2.parse("YES+NO")  # this is what freddy helped us with
+    colour_state_vocab = spa.Vocabulary(D)
+    colour_state_vocab.parse("YES+NO")  # this is what freddy helped us with
 
     # make the list of colours / adding all the colour states
     for color in color_list:
@@ -128,21 +128,27 @@ with model:
 
     # the colour detection. convert numbers into a spa vector (?)
     def convert(x):
+        """
+        This function converts the integral value into the corresponding semantic pointer representing the colour
+        :param x: State input
+        :type x: float
+        :return: Semantic pointer
+        :rtype: Vector
+        """
         if x == 1:
-            return vocab['GREEN'].v.reshape(D)
+            return colour_vocab['GREEN'].v.reshape(D)
         elif x == 2:
-            return vocab['RED'].v.reshape(D)
+            return colour_vocab['RED'].v.reshape(D)
         elif x == 3:
-            return vocab['BLUE'].v.reshape(D)
+            return colour_vocab['BLUE'].v.reshape(D)
         elif x == 4:
-            return vocab['MAGENTA'].v.reshape(D)
+            return colour_vocab['MAGENTA'].v.reshape(D)
         elif x == 5:
-            return vocab['YELLOW'].v.reshape(D)
+            return colour_vocab['YELLOW'].v.reshape(D)
         else:
-            return vocab['WHITE'].v.reshape(D)
+            return colour_vocab['WHITE'].v.reshape(D)
 
 
-    # make notes for each colour on complite time
     # model.clean = memory clean up to stabalize
     # and all the connections
     for color in color_list:
@@ -150,7 +156,7 @@ with model:
         exec(f"nengo.Connection(model.{color.lower()}.output, model.clean_{color.lower()}.input, synapse=0.01)")
         exec(f"nengo.Connection(model.clean_{color.lower()}.output, model.{color.lower()}.output, synapse=0.01)")
 
-    model.converter = spa.State(D, vocab=vocab)
+    model.converter = spa.State(D, vocab=colour_vocab)
     nengo.Connection(current_color, model.converter.input, function=convert)
 
     # if a colour is detected, then output YES for that colour
@@ -167,22 +173,24 @@ with model:
 
 
     def spa_to_nengo(x):
-        return [1.] if vocab["YES"].dot(x) else [0.]
+        """
+        Converting spa input into float value for the nengo Ensemble
+        :param x: State Input
+        :type x: float
+        :return: 1 or 0 based on if the colour state is activated
+        :rtype: list
+        """
+        return [1.] if colour_vocab["YES"].dot(x) else [0.]
 
+    # Ensemble that counts the number of coloured tiles agent has seen.
     model.counter = nengo.Ensemble(1000, 1, radius=5)
 
     # Thijs Gelton helped us with the implementation of this part.
     for colour in color_list:
         exec(f"model.clean_{colour.lower()}.output.output = lambda t, x:x")
         exec(f"nengo.Connection(model.clean_{colour.lower()}.output, model.counter, function=spa_to_nengo)")
-    n_neurons = 1000
+
     model.stop = nengo.Ensemble(n_neurons, 1)
-
-    # very simple tresholhd that returns 0 when max colours is reachered (or atleast close enough given the rel_tol)
-    def threshold(x):
-        return [0.] if math.isclose(x[0], MAX_COLOURS, rel_tol=0.2) else [1.]
-
-
     inhib = nengo.Node(size_in=1)
 
 
@@ -192,19 +200,19 @@ with model:
         of the stop neurons to exact 0 (i.e They are inhibited)
         """
         if math.isclose(x[0], MAX_COLOURS):
-            print(x)
             return [1.]
         elif x[0] > MAX_COLOURS:
-            print("final")
             # This is just in case we have colours in sequential pattern
             return [1.]
         else:
             return [0.]
+
 
     nengo.Connection(model.counter, inhib, function=inhibit)
     nengo.Connection(
         inhib, model.stop.neurons,
         transform=-10 * np.ones((n_neurons, 1))
     )
-    nengo.Connection(model.counter, model.stop, function=threshold)
+    nengo.Connection(model.counter, model.stop, function=lambda x: x / x)
+    # Updating the movement function to make the agent move or stop at its track
     nengo.Connection(model.stop, movement[2])
