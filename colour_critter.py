@@ -208,7 +208,10 @@ with model:
             return [0.]
 
 
+    # Provides input to the inhibit node to stop neuron activity when the agent has crossed the threshold
     nengo.Connection(model.counter, inhib, function=inhibit)
+
+    # Stops the neuron activity
     nengo.Connection(
         inhib, model.stop.neurons,
         transform=-10 * np.ones((n_neurons, 1))
