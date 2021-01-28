@@ -123,7 +123,7 @@ with model:
 
     # make the list of colours / adding all the colour states
     for color in color_list:
-        exec(f"model.{color.lower()} = spa.State(D, vocab=vocab2)")
+        exec(f"model.{color.lower()} = spa.State(D, vocab=colour_state_vocab)")
 
 
     # the colour detection. convert numbers into a spa vector (?)
@@ -152,7 +152,7 @@ with model:
     # model.clean = memory clean up to stabalize
     # and all the connections
     for color in color_list:
-        exec(f"model.clean_{color.lower()} = spa.AssociativeMemory(vocab2, wta_output=True, threshold=0.3)")
+        exec(f"model.clean_{color.lower()} = spa.AssociativeMemory(colour_state_vocab, wta_output=True, threshold=0.3)")
         exec(f"nengo.Connection(model.{color.lower()}.output, model.clean_{color.lower()}.input, synapse=0.01)")
         exec(f"nengo.Connection(model.clean_{color.lower()}.output, model.{color.lower()}.output, synapse=0.01)")
 
